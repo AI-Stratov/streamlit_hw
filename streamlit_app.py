@@ -83,14 +83,14 @@ def main():
 
     st.dataframe(
         season_stats.style.format({"mean": "{:.2f}", "std": "{:.2f}", "min": "{:.1f}", "max": "{:.1f}"}),
-        use_container_width=True
+        width='stretch'
     )
 
     season_stats['std_2'] = season_stats['std'] * 2
     fig_bar = px.bar(season_stats, x='season', y='mean', error_y='std_2',
                      title="Средняя температура по сезонам (± 2 std)",
                      color='season')
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.plotly_chart(fig_bar, width='stretch')
 
     st.subheader(f"История температур: {city}")
     fig_line = px.line(city_data, x='timestamp', y=['temperature', 'rolling_mean', 'trend'],
@@ -100,7 +100,7 @@ def main():
     anom = city_data[city_data['is_anomaly']]
     fig_line.add_scatter(x=anom['timestamp'], y=anom['temperature'],
                          mode='markers', name='Аномалия', marker=dict(color='red', size=6))
-    st.plotly_chart(fig_line, use_container_width=True)
+    st.plotly_chart(fig_line, width='stretch')
 
     st.divider()
 
