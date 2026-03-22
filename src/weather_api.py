@@ -1,5 +1,6 @@
 import asyncio
 import time
+import urllib.parse
 
 import aiohttp
 import requests
@@ -9,7 +10,8 @@ from src.exceptions import CityNotFoundException, InvalidAPIKeyException, OpenWe
 
 
 def get_weather_sync(city: str, api_key: str) -> WeatherEntity:
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    safe_city = urllib.parse.quote(city)
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={safe_city}&appid={api_key}&units=metric"
     try:
         response = requests.get(url, timeout=5)
         data = response.json()
@@ -31,7 +33,8 @@ def get_weather_sync(city: str, api_key: str) -> WeatherEntity:
 
 
 async def fetch_weather_async(session: aiohttp.ClientSession, city: str, api_key: str):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    safe_city = urllib.parse.quote(city)
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={safe_city}&appid={api_key}&units=metric"
     timeout = aiohttp.ClientTimeout(total=5)
     async with session.get(url, timeout=timeout) as resp:
         return await resp.json()
