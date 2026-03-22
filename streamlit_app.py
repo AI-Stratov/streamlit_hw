@@ -14,7 +14,6 @@ from src.generate_data import month_to_season
 from src.utils import EXPERIMENT_CONCLUSIONS
 from src.weather_api import get_multiple_weather_async, get_multiple_weather_sync, get_weather_sync
 
-# RuntimeError: This event loop is already running
 nest_asyncio.apply()
 
 
@@ -112,7 +111,9 @@ def main():
             if st.button("Запустить тест сети"):
                 with st.spinner("Опрашиваем API..."):
                     _, t_sync = get_multiple_weather_sync(all_cities, api_key)
-                    _, t_async = asyncio.run(get_multiple_weather_async(all_cities, api_key))
+                    t0 = time.perf_counter()
+                    asyncio.run(get_multiple_weather_async(all_cities, api_key))
+                    t_async = time.perf_counter() - t0
                     cn1, cn2 = st.columns(2)
                     cn1.metric("Синхронный опрос (for loop)", f"{t_sync:.2f} сек")
                     cn2.metric("Асинхронный опрос (asyncio)", f"{t_async:.2f} сек")

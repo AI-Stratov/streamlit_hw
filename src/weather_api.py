@@ -38,12 +38,11 @@ async def fetch_weather_async(session: aiohttp.ClientSession, city: str, api_key
 
 
 async def get_multiple_weather_async(cities: list[str], api_key: str):
-    start_time = time.perf_counter()
     timeout = aiohttp.ClientTimeout(total=5)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         tasks = [fetch_weather_async(session, city, api_key) for city in cities]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-    return results, time.perf_counter() - start_time
+    return results
 
 
 def get_multiple_weather_sync(cities: list[str], api_key: str):
