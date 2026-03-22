@@ -16,7 +16,7 @@ from src.weather_api import get_weather_sync, get_multiple_weather_async, get_mu
 
 st.set_page_config(page_title="Climate Monitor Pro", layout="wide")
 
-st.title("🌡️ Анализ температурных данных и мониторинг текущей температуры")
+st.title("Анализ температурных данных и мониторинг текущей температуры")
 
 
 @st.cache_data
@@ -33,15 +33,15 @@ if uploaded_file:
     df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
     df = df.dropna(subset=['timestamp'])
 
-    with st.expander("🚀 Глобальный эксперимент: Сравнение методов параллелизма"):
+    with st.expander("Эксперимент: Сравнение методов параллелизма"):
         # Вывод информации о системе
         cpu_count = os.cpu_count() or 1
-        st.write(f"💻 Доступно ядер CPU: **{cpu_count}**")
+        st.write(f"Доступно ядер CPU: **{cpu_count}**")
         if cpu_count == 1:
             st.warning(
                 "Внимание: На 1 ядре параллельные методы (Multiprocessing/Joblib) будут медленнее последовательного из-за накладных расходов.")
 
-        if st.button("Запустить большой тест"):
+        if st.button("Запустить тест"):
             cities_list = [group for _, group in df.groupby('city')]
             results = []
 
@@ -74,11 +74,33 @@ if uploaded_file:
             st.table(res_df)
             st.bar_chart(res_df.set_index("Метод"))
 
-            st.info("💡 **Аналитический вывод:**")
+            st.info("**Вывод:**")
             st.write(f"""
-            - Если время **Multiprocessing** значительно выше других — это из-за затрат на `spawn` новых процессов и копирование памяти.
-            - **Threading** в Python ограничен GIL, но для Pandas/NumPy (которые написаны на C) он часто дает выигрыш даже на малых данных.
-            - **Последовательный метод** остается чемпионом на сверхмалых задачах, где "администрирование" потоков дороже самих расчетов.
+            ### Аналитические выводы по результатам бенчмарка
+
+            - Если время **Multiprocessing** значительно выше других методов - это связано с накладными расходами на `spawn` новых процессов,
+              сериализацию (pickle) DataFrame и межпроцессное взаимодействие (IPC). Для небольших датасетов эти затраты превышают выигрыш от параллелизма.
+
+            - **Threading** в Python ограничен GIL, однако библиотеки **Pandas** и **NumPy** выполняют вычисления в C и освобождают GIL,
+              поэтому потоки могут реально выполняться параллельно и часто показывают лучший результат на аналитических задачах.
+
+            - **Последовательный метод** остаётся самым быстрым на маленьких задачах, где накладные расходы на создание потоков и процессов
+              больше времени самих вычислений.
+
+            - Несмотря на то, что `os.cpu_count()` может показывать большое количество ядер, в **Streamlit Cloud** приложение работает внутри
+              контейнера с ограниченными CPU-ресурсами. Создание большого числа процессов приводит к конкуренции за CPU, переключению контекста
+              и дополнительным накладным расходам, что может существенно замедлять multiprocessing.
+
+            ### Практическое правило выбора параллелизма в Python
+
+            | Тип задачи | Рекомендуемый подход |
+            |------------|---------------------|
+            | Маленькие вычисления | Sequential |
+            | Pandas / NumPy | Threading |
+            | CPU-bound (чистый Python) | Multiprocessing |
+            | Machine Learning / sklearn | Joblib |
+            | Сетевые запросы / API | Asyncio |
+            | Web-приложения (Streamlit) | Threading + Async |
             """)
 
     analyzed_df = load_and_analyze_data(df)
@@ -86,7 +108,7 @@ if uploaded_file:
     city = st.selectbox("Выберите город для детального анализа", analyzed_df['city'].unique())
     city_data = analyzed_df[analyzed_df['city'] == city]
 
-    st.subheader(f"📊 Сезонные профили: {city}")
+    st.subheader(f"Сезонные профили: {city}")
     season_stats = city_data.groupby('season')['temperature'].agg(['mean', 'std', 'min', 'max']).reset_index()
 
     col_stat1, col_stat2 = st.columns([1, 2])
@@ -100,7 +122,7 @@ if uploaded_file:
                          color='season')
         st.plotly_chart(fig_bar, width='stretch')
 
-    st.subheader(f"📈 История температур: {city}")
+    st.subheader(f"История температур: {city}")
     fig = px.line(city_data, x='timestamp', y=['temperature', 'rolling_mean', 'trend'],
                   title=f"Временной ряд для {city} с выделением тренда и сглаживания",
                   color_discrete_map={"temperature": "lightblue", "rolling_mean": "orange", "trend": "red"})
@@ -112,10 +134,10 @@ if uploaded_file:
 
     st.divider()
     if api_key:
-        st.subheader("🌍 Мониторинг в реальном времени и тест API")
+        st.subheader("Мониторинг в реальном времени и тест API")
 
         all_cities = df['city'].unique().tolist()
-        with st.expander("⚡ Провести эксперимент: Sync vs Async API (Network)"):
+        with st.expander("Эксперимент: Sync vs Async API"):
             if st.button("Запустить тест сети"):
                 with st.spinner("Опрашиваем API для всех городов..."):
                     _, t_sync = get_multiple_weather_sync(all_cities, api_key)
@@ -147,9 +169,9 @@ if uploaded_file:
             res_col2.metric("Текущий сезон (норма)", f"{mean_temp:.1f} °C (±{2 * std_temp:.1f})", current_season)
 
             if is_anomaly:
-                st.error(f"🚨 Аномальная температура для сезона {current_season}!")
+                st.error(f"Аномальная температура для сезона {current_season}!")
             else:
-                st.success(f"✅ Температура в пределах нормы для сезона {current_season}.")
+                st.success(f"Температура в пределах нормы для сезона {current_season}.")
 
         elif cod == "401":
             st.error(
