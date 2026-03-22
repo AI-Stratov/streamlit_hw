@@ -5,7 +5,7 @@ import aiohttp
 import requests
 
 from src.entities import WeatherEntity
-from src.exceptions import InvalidAPIKeyException, CityNotFoundException, OpenWeatherException
+from src.exceptions import CityNotFoundException, InvalidAPIKeyException, OpenWeatherException
 
 
 def get_weather_sync(city: str, api_key: str) -> WeatherEntity:
@@ -27,7 +27,7 @@ def get_weather_sync(city: str, api_key: str) -> WeatherEntity:
         else:
             raise OpenWeatherException(data.get("message", ""), cod=cod)
     except requests.RequestException as e:
-        raise OpenWeatherException(f"Network error: {str(e)}")
+        raise OpenWeatherException(f"Network error: {str(e)}") from e
 
 
 async def fetch_weather_async(session: aiohttp.ClientSession, city: str, api_key: str):

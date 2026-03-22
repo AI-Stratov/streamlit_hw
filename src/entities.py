@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -13,5 +12,5 @@ class WeatherMetrics(BaseModel):
 class WeatherEntity(BaseModel):
     main: WeatherMetrics
     cod: int | str
-    name: Optional[str] = None
-    message: Optional[str] = None
+    name: str | None = None
+    message: str | None = None

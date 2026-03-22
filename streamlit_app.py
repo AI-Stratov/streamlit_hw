@@ -8,14 +8,11 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src.data_analysis import (
-    run_sequential, run_multiprocessing, run_threading,
-    run_joblib, parallel_analysis
-)
-from src.exceptions import OpenWeatherException, InvalidAPIKeyException
+from src.data_analysis import parallel_analysis, run_joblib, run_multiprocessing, run_sequential, run_threading
+from src.exceptions import InvalidAPIKeyException, OpenWeatherException
 from src.generate_data import month_to_season
 from src.utils import EXPERIMENT_CONCLUSIONS
-from src.weather_api import get_weather_sync, get_multiple_weather_async, get_multiple_weather_sync
+from src.weather_api import get_multiple_weather_async, get_multiple_weather_sync, get_weather_sync
 
 # RuntimeError: This event loop is already running
 nest_asyncio.apply()
