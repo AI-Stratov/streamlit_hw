@@ -9,6 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 from src.data_analysis import parallel_analysis, run_joblib, run_multiprocessing, run_sequential, run_threading
+from src.entities import WeatherEntity
 from src.exceptions import InvalidAPIKeyException, OpenWeatherException
 from src.generate_data import month_to_season
 from src.utils import EXPERIMENT_CONCLUSIONS
@@ -106,17 +107,39 @@ def main():
     if api_key:
         st.subheader("Мониторинг в реальном времени и тест API")
 
-        all_cities = df['city'].unique().tolist()[:10]
+        all_cities = df['city'].unique().tolist()[:10] * 5
+
         with st.expander("Эксперимент: Sync vs Async API"):
             if st.button("Запустить тест сети"):
-                with st.spinner("Опрашиваем API..."):
+                with st.spinner(f"Опрашиваем API ({len(all_cities)} запросов)..."):
                     _, t_sync = get_multiple_weather_sync(all_cities, api_key)
+
                     t0 = time.perf_counter()
-                    asyncio.run(get_multiple_weather_async(all_cities, api_key))
+                    async_results = asyncio.run(get_multiple_weather_async(all_cities, api_key))
                     t_async = time.perf_counter() - t0
+
                     cn1, cn2 = st.columns(2)
                     cn1.metric("Синхронный опрос (for loop)", f"{t_sync:.2f} сек")
                     cn2.metric("Асинхронный опрос (asyncio)", f"{t_async:.2f} сек")
+
+                    success_count = 0
+                    error_count = 0
+                    error_msgs = []
+
+                    for res in async_results:
+                        if isinstance(res, Exception):
+                            error_count += 1
+                            error_msgs.append(type(res).__name__)
+                        elif isinstance(res, WeatherEntity):
+                            success_count += 1
+                        else:
+                            error_count += 1
+
+                    st.write(f"**Статистика асинхронных запросов:** Успешно: {success_count} | Ошибок: {error_count}")
+                    if error_count > 0:
+                        unique_errors = list(set(error_msgs))
+                        st.warning(f"Причины ошибок: {', '.join(unique_errors[:3])}")
+
                     st.success(
                         "Вывод: Асинхронные запросы выполняются конкурентно, экономя время при сетевых вызовах (I/O).")
 
