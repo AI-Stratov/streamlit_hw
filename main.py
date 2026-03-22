@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 from datetime import datetime
 
@@ -6,11 +7,14 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src.data_analysis import parallel_analysis, sequential_analysis
+from src.data_analysis import (
+    run_sequential, run_multiprocessing, run_threading,
+    run_joblib, parallel_analysis
+)
 from src.generate_data import month_to_season
-from src.weather_api import get_weather_sync, get_multiple_weather_sync, get_multiple_weather_async
+from src.weather_api import get_weather_sync, get_multiple_weather_async, get_multiple_weather_sync
 
-st.set_page_config(page_title="Climate Monitor", layout="wide")
+st.set_page_config(page_title="Climate Monitor Pro", layout="wide")
 
 st.title("🌡️ Анализ температурных данных и мониторинг текущей температуры")
 
@@ -29,37 +33,53 @@ if uploaded_file:
     df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
     df = df.dropna(subset=['timestamp'])
 
-    with st.expander("🚀 Провести эксперимент: Последовательный vs Параллельный анализ (CPU)"):
-        if st.button("Запустить тест CPU"):
-            with st.spinner("Считаем..."):
+    with st.expander("🚀 Глобальный эксперимент: Сравнение методов параллелизма"):
+        # Вывод информации о системе
+        cpu_count = os.cpu_count() or 1
+        st.write(f"💻 Доступно ядер CPU: **{cpu_count}**")
+        if cpu_count == 1:
+            st.warning(
+                "Внимание: На 1 ядре параллельные методы (Multiprocessing/Joblib) будут медленнее последовательного из-за накладных расходов.")
+
+        if st.button("Запустить большой тест"):
+            cities_list = [group for _, group in df.groupby('city')]
+            results = []
+
+            with st.spinner("Проводим бенчмарки..."):
+                # 1. Последовательно
                 t0 = time.perf_counter()
-                _ = sequential_analysis(df)
-                t_seq = time.perf_counter() - t0
+                _ = run_sequential(cities_list)
+                results.append({"Метод": "Последовательный", "Время (сек)": round(time.perf_counter() - t0, 4)})
 
+                # 2. Multiprocessing
                 t0 = time.perf_counter()
-                _ = parallel_analysis(df)
-                t_par = time.perf_counter() - t0
+                try:
+                    _ = run_multiprocessing(cities_list)
+                    results.append(
+                        {"Метод": "Multiprocessing (Pool)", "Время (сек)": round(time.perf_counter() - t0, 4)})
+                except Exception as e:
+                    results.append({"Метод": "Multiprocessing (Pool)", "Время (сек)": "Ошибка"})
 
-                col1, col2 = st.columns(2)
-                col1.metric("Последовательно", f"{t_seq:.3f} сек")
-                col2.metric("Параллельно (Pool)", f"{t_par:.3f} сек")
+                # 3. Threading
+                t0 = time.perf_counter()
+                _ = run_threading(cities_list)
+                results.append({"Метод": "Threading (4 threads)", "Время (сек)": round(time.perf_counter() - t0, 4)})
 
-                if t_par > t_seq:
-                    st.warning("⚠️ Последовательный метод оказался быстрее параллельного.")
-                    st.info(
-                        "**Аналитический вывод:** Несмотря на то, что серверы Streamlit Cloud работают на Linux "
-                        "(где процессы создаются быстро через `fork`, в отличие от Windows), накладные расходы на "
-                        "инициализацию `multiprocessing.Pool` всё равно превышают выгоду от распараллеливания. "
-                        "Причина кроется в размере данных: ~55 000 строк - слишком малый объем. Библиотека Pandas "
-                        "оптимизирована на C и обрабатывает его в одном потоке за доли секунды. Параллельность "
-                        "даст реальный прирост скорости только на 'тяжелых' датасетах (от сотен тысяч строк)."
-                    )
-                else:
-                    st.success("✅ Параллельный метод оказался быстрее!")
-                    st.info(
-                        "**Аналитический вывод:** Объем данных оказался достаточным, чтобы выигрыш от распределения "
-                        "задач по ядрам процессора перекрыл накладные расходы на создание процессов в операционной системе."
-                    )
+                # 4. Joblib
+                t0 = time.perf_counter()
+                _ = run_joblib(cities_list)
+                results.append({"Метод": "Joblib (Parallel)", "Время (сек)": round(time.perf_counter() - t0, 4)})
+
+            res_df = pd.DataFrame(results)
+            st.table(res_df)
+            st.bar_chart(res_df.set_index("Метод"))
+
+            st.info("💡 **Аналитический вывод:**")
+            st.write(f"""
+            - Если время **Multiprocessing** значительно выше других — это из-за затрат на `spawn` новых процессов и копирование памяти.
+            - **Threading** в Python ограничен GIL, но для Pandas/NumPy (которые написаны на C) он часто дает выигрыш даже на малых данных.
+            - **Последовательный метод** остается чемпионом на сверхмалых задачах, где "администрирование" потоков дороже самих расчетов.
+            """)
 
     analyzed_df = load_and_analyze_data(df)
 

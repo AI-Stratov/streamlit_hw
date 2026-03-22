@@ -1,7 +1,10 @@
-from multiprocessing import Pool
+import os
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import get_context
 
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 
 
 def analyze_city(city_data):
@@ -32,14 +35,35 @@ def analyze_city(city_data):
     return city_data
 
 
+def run_sequential(cities):
+    return pd.concat([analyze_city(city) for city in cities])
+
+def run_multiprocessing(cities):
+    cpus = os.cpu_count() or 1
+    workers = min(cpus, len(cities))
+
+    with get_context("spawn").Pool(processes=workers) as pool:
+        result = pool.map(analyze_city, cities)
+
+    return pd.concat(result)
+
+def run_threading(cities):
+    workers = min(4, len(cities))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        result = list(executor.map(analyze_city, cities))
+    return pd.concat(result)
+
+def run_joblib(cities):
+    # n_jobs=-1 использует все доступные ядра
+    result = Parallel(n_jobs=-1)(delayed(analyze_city)(city) for city in cities)
+    return pd.concat(result)
+
+
 def parallel_analysis(df):
-    """Распараллеливание по городам."""
     cities = [group for _, group in df.groupby('city')]
-    with Pool() as pool:
-        result_parts = pool.map(analyze_city, cities)
+    workers = min(4, len(cities))
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        result_parts = list(executor.map(analyze_city, cities))
+
     return pd.concat(result_parts)
-
-
-def sequential_analysis(df):
-    """Последовательный анализ для сравнения."""
-    return pd.concat([analyze_city(group) for _, group in df.groupby('city')])
